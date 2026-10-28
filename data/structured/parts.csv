@@ -1,0 +1,12 @@
+part_id,name,compatible_model,unit_cost_usd,supplier_id
+P-1001,HX-500 Seal Kit,HX-500,1850.00,S-01
+P-1002,HX-500 Hydraulic Pump,HX-500,12400.00,S-01
+P-1003,HX-500 Pressure Transducer,HX-500,640.00,S-05
+P-2001,CNC-7 Spindle Bearing Set,CNC-7,3200.00,S-02
+P-2002,CNC-7 Coolant Pump,CNC-7,980.00,S-05
+P-2003,CNC-7 Tool Changer Gripper,CNC-7,450.00,S-02
+P-3001,RW-3 Wire Feed Roller Kit,RW-3,310.00,S-03
+P-3002,RW-3 Contact Tips (box of 50),RW-3,95.00,S-03
+P-3003,RW-3 Torch Cable,RW-3,1150.00,S-03
+P-4001,CV-200 Drive Belt,CV-200,520.00,S-04
+P-4002,CV-200 Gear Motor,CV-200,2750.00,S-04

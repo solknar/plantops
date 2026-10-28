@@ -1,0 +1,217 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PlantOps Copilot</title>
+<style>
+  :root {
+    --bg: #f6f7f9; --panel: #ffffff; --ink: #1b1f24; --muted: #5d6570; --line: #e2e5ea;
+    --accent: #1a73e8; --accent-soft: #e8f0fe; --ok: #188038; --warn: #b06000; --bad: #c5221f;
+    --agent-coordinator: #1a73e8; --agent-data_analyst: #188038; --agent-knowledge_researcher: #9334e6;
+    --agent-critic: #b06000; --agent-refiner: #c5221f; --agent-other: #80868b;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #121417; --panel: #1b1e23; --ink: #e8eaed; --muted: #9aa0a6; --line: #2d3138;
+      --accent: #8ab4f8; --accent-soft: #1f2a3c; --ok: #81c995; --warn: #fdd663; --bad: #f28b82;
+      --agent-coordinator: #8ab4f8; --agent-data_analyst: #81c995; --agent-knowledge_researcher: #c58af9;
+      --agent-critic: #fdd663; --agent-refiner: #f28b82; --agent-other: #9aa0a6;
+    }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font: 14px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; }
+  header { display: flex; align-items: baseline; gap: 12px; padding: 14px 20px; border-bottom: 1px solid var(--line); background: var(--panel); }
+  header h1 { font-size: 17px; margin: 0; }
+  header span { color: var(--muted); font-size: 13px; }
+  main { display: grid; grid-template-columns: minmax(0, 1.1fr) minmax(0, 1fr); gap: 16px; padding: 16px 20px; max-width: 1500px; margin: 0 auto; }
+  @media (max-width: 900px) { main { grid-template-columns: 1fr; padding: 12px 16px; } }
+  .panel { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 14px 16px; min-width: 0; }
+  .panel h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .04em; color: var(--muted); margin: 0 0 10px; }
+  #chat { display: flex; flex-direction: column; height: calc(100vh - 100px); min-height: 520px; }
+  #log { flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 12px; padding-right: 4px; }
+  .msg { padding: 10px 12px; border-radius: 8px; max-width: 100%; overflow-wrap: anywhere; }
+  .msg.user { background: var(--accent-soft); align-self: flex-end; }
+  .msg.bot { border: 1px solid var(--line); }
+  .msg.bot code { background: var(--bg); padding: 1px 4px; border-radius: 4px; font-size: 12px; }
+  .msg .meta { color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .badge { display: inline-block; font-size: 11px; padding: 1px 7px; border-radius: 99px; border: 1px solid currentColor; margin-left: 6px; }
+  .badge.ok { color: var(--ok); } .badge.warn { color: var(--warn); }
+  form { display: flex; gap: 8px; margin-top: 10px; }
+  textarea { flex: 1; resize: none; height: 64px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--ink); font: inherit; }
+  button { background: var(--accent); color: var(--panel); border: 0; border-radius: 8px; padding: 0 16px; font: inherit; font-weight: 600; cursor: pointer; }
+  button:disabled { opacity: .5; cursor: progress; }
+  .samples { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+  .samples button { background: transparent; color: var(--accent); border: 1px solid var(--line); font-weight: 400; font-size: 12px; padding: 3px 9px; }
+  .side { display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(118px, 1fr)); gap: 8px; }
+  .tile { border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .tile .v { font-size: 18px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .tile .k { font-size: 11px; color: var(--muted); }
+  table { width: 100%; border-collapse: collapse; font-size: 12px; font-variant-numeric: tabular-nums; }
+  th, td { text-align: left; padding: 5px 6px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  th { color: var(--muted); font-weight: 500; }
+  td.num, th.num { text-align: right; }
+  .swatch { display: inline-block; width: 8px; height: 8px; border-radius: 2px; margin-right: 6px; }
+  #trace { max-height: 420px; overflow: auto; }
+  .span { display: grid; grid-template-columns: minmax(150px, 38%) 1fr; align-items: center; gap: 8px; font-size: 12px; height: 20px; }
+  .span .name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .span .track { position: relative; height: 12px; }
+  .span .bar { position: absolute; height: 12px; border-radius: 3px; min-width: 2px; }
+  .span .dur { position: absolute; font-size: 10px; color: var(--muted); top: -1px; }
+  .empty { color: var(--muted); font-size: 13px; }
+  .scroll-x { overflow-x: auto; }
+</style>
+</head>
+<body>
+<header><h1>PlantOps Copilot</h1><span>Northwind Fabrication · ADK multi-agent · Gemini</span></header>
+<main>
+  <section class="panel" id="chat">
+    <h2>Ask</h2>
+    <div id="log"><p class="empty">Ask about downtime, maintenance, spare parts, suppliers or procedures. Follow-up questions keep the session.</p></div>
+    <form id="f">
+      <textarea id="q" placeholder="e.g. Which suppliers are below the on-time requirement in our supplier agreement?"></textarea>
+      <button id="send">Send</button>
+    </form>
+    <div class="samples" id="samples"></div>
+  </section>
+  <section class="side">
+    <div class="panel">
+      <h2>This request</h2>
+      <div class="tiles" id="req-tiles"><p class="empty">No request yet.</p></div>
+    </div>
+    <div class="panel">
+      <h2>Per agent</h2>
+      <div class="scroll-x" id="agents"><p class="empty">—</p></div>
+    </div>
+    <div class="panel">
+      <h2>Trace</h2>
+      <div id="trace"><p class="empty">The span tree for the last request appears here.</p></div>
+    </div>
+    <div class="panel">
+      <h2>Fleet (recent requests)</h2>
+      <div class="tiles" id="fleet"></div>
+      <div class="scroll-x" id="models" style="margin-top:10px"></div>
+    </div>
+  </section>
+</main>
+<script>
+const SAMPLES = [
+  "What does E-42 mean on the HX-500 and what should the technician do first?",
+  "Which plant had the most unplanned downtime minutes in Q3 2026?",
+  "Are any critical spares below their reorder point? List plant and part.",
+  "Which suppliers are below the on-time requirement in our supplier agreement?",
+];
+let sessionId = null;
+const $ = (id) => document.getElementById(id);
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const agentColor = (name) => {
+  const known = ["coordinator", "data_analyst", "knowledge_researcher", "critic", "refiner"];
+  const a = known.find((k) => name.includes(k));
+  return `var(--agent-${a || "other"})`;
+};
+
+function md(text) {
+  // Minimal Markdown: code, bold, bullets, paragraphs. Content is escaped first.
+  const lines = esc(text).split("\n");
+  let html = "", inList = false;
+  for (const raw of lines) {
+    let l = raw.replace(/`([^`]+)`/g, "<code>$1</code>").replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>");
+    const m = l.match(/^\s*[-*]\s+(.*)/) || l.match(/^\s*\d+\.\s+(.*)/);
+    if (m) { if (!inList) { html += "<ul>"; inList = true; } html += `<li>${m[1]}</li>`; continue; }
+    if (inList) { html += "</ul>"; inList = false; }
+    html += l.trim() ? `<p style="margin:4px 0">${l}</p>` : "";
+  }
+  return html + (inList ? "</ul>" : "");
+}
+
+function tile(k, v) { return `<div class="tile"><div class="v">${v ?? "—"}</div><div class="k">${k}</div></div>`; }
+const fmt = (n, d = 0) => (n == null ? "—" : Number(n).toLocaleString(undefined, { maximumFractionDigits: d }));
+
+function renderRequest(m) {
+  $("req-tiles").innerHTML = [
+    tile("latency", fmt(m.latency_ms / 1000, 1) + " s"),
+    tile("LLM calls", m.llm_calls), tile("tool calls", m.tool_calls),
+    tile("input tokens", fmt(m.input_tokens)), tile("output tokens", fmt(m.output_tokens + (m.thoughts_tokens || 0))),
+    tile("output tok/s", fmt(m.output_tokens_per_sec)), tile("cost (list $)", "$" + fmt(m.cost_usd, 5)),
+    tile("reflections", m.reflections), tile("tokens trimmed", fmt(m.tokens_saved_by_trimming)),
+  ].join("");
+  const rows = Object.entries(m.per_agent || {}).map(([a, s]) =>
+    `<tr><td><span class="swatch" style="background:${agentColor(a)}"></span>${esc(a)}</td><td class="num">${s.llm_calls}</td>
+     <td class="num">${fmt(s.input_tokens)}</td><td class="num">${fmt(s.output_tokens)}</td><td class="num">${fmt(s.latency_ms)}</td><td class="num">$${fmt(s.cost_usd, 5)}</td></tr>`).join("");
+  $("agents").innerHTML = rows ? `<table><tr><th>agent</th><th class="num">calls</th><th class="num">in tok</th><th class="num">out tok</th><th class="num">ms</th><th class="num">cost</th></tr>${rows}</table>` : `<p class="empty">—</p>`;
+}
+
+async function renderTrace(traceId) {
+  let spans = [];
+  for (let i = 0; i < 4 && !spans.length; i++) {
+    const r = await fetch(`/api/traces/${traceId}`);
+    if (r.ok) spans = await r.json(); else await new Promise((res) => setTimeout(res, 600));
+  }
+  if (!spans.length) { $("trace").innerHTML = `<p class="empty">Trace not available yet.</p>`; return; }
+  const total = Math.max(...spans.map((s) => s.offset_ms + s.duration_ms)) || 1;
+  $("trace").innerHTML = spans.map((s) => {
+    const left = (s.offset_ms / total) * 100, width = Math.max((s.duration_ms / total) * 100, 0.3);
+    const agent = s.attributes["gen_ai.agent.name"] || s.name;
+    const color = s.name.startsWith("generate_content") ? "var(--accent)" : s.name.startsWith("execute_tool") ? "var(--ok)"
+      : s.name.startsWith("invoke_agent") ? agentColor(agent) : "var(--agent-other)";
+    const label = `${s.name}${s.attributes["plantops.llm.tokens_per_sec"] ? ` · ${s.attributes["plantops.llm.tokens_per_sec"]} tok/s` : ""}`;
+    return `<div class="span" title="${esc(label)} — ${s.duration_ms} ms">
+      <div class="name" style="padding-left:${s.depth * 10}px">${esc(label)}</div>
+      <div class="track"><div class="bar" style="left:${left}%;width:${width}%;background:${color}"></div>
+      <div class="dur" style="left:calc(${Math.min(left + width, 88)}% + 4px)">${fmt(s.duration_ms)} ms</div></div></div>`;
+  }).join("");
+}
+
+async function renderFleet() {
+  const m = await (await fetch("/api/metrics")).json();
+  if (!m.requests) { $("fleet").innerHTML = `<p class="empty">No requests recorded yet.</p>`; return; }
+  $("fleet").innerHTML = [
+    tile("requests", m.requests), tile("p50 latency", fmt(m.latency_ms.p50 / 1000, 1) + " s"), tile("p95 latency", fmt(m.latency_ms.p95 / 1000, 1) + " s"),
+    tile("avg $/request", "$" + fmt(m.avg_cost_usd_per_request, 5)), tile("avg tokens/request", fmt(m.avg_tokens_per_request)),
+    tile("avg reflections", m.avg_reflections),
+  ].join("");
+  $("models").innerHTML = `<table><tr><th>model</th><th class="num">calls</th><th class="num">avg tok/s</th><th class="num">avg ms</th><th class="num">in tok</th><th class="num">out tok</th><th class="num">cost</th></tr>` +
+    m.by_model.map((r) => `<tr><td>${esc(r.model)}</td><td class="num">${r.calls}</td><td class="num">${fmt(r.avg_tokens_per_sec)}</td><td class="num">${fmt(r.avg_latency_ms)}</td>
+      <td class="num">${fmt(r.input_tokens)}</td><td class="num">${fmt(r.output_tokens)}</td><td class="num">$${fmt(r.cost_usd, 4)}</td></tr>`).join("") + `</table>`;
+}
+
+function addMsg(cls, html) {
+  const log = $("log");
+  if (log.querySelector(".empty")) log.innerHTML = "";
+  const d = document.createElement("div");
+  d.className = `msg ${cls}`; d.innerHTML = html; log.appendChild(d); log.scrollTop = log.scrollHeight;
+  return d;
+}
+
+async function ask(question) {
+  addMsg("user", esc(question));
+  const pending = addMsg("bot", `<span class="empty">Coordinator is delegating to specialists, then the critic reviews the draft…</span>`);
+  $("send").disabled = true;
+  try {
+    const r = await fetch("/api/chat", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question, session_id: sessionId }) });
+    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
+    const res = await r.json();
+    sessionId = res.session_id;
+    const tools = res.steps.filter((s) => s.type === "tool_call").map((s) => `${s.agent}→${s.name}`);
+    pending.innerHTML = md(res.answer) +
+      `<div class="meta">${res.approved_by_critic ? '<span class="badge ok">critic approved</span>' : '<span class="badge warn">not approved by critic</span>'}
+       ${fmt(res.metrics.latency_ms / 1000, 1)} s · ${tools.length} tool calls · <span title="${esc(tools.join(", "))}">hover for steps</span></div>`;
+    renderRequest(res.metrics);
+    renderTrace(res.trace_id);
+    renderFleet();
+  } catch (e) {
+    pending.innerHTML = `<span style="color:var(--bad)">Request failed: ${esc(e.message)}</span>`;
+  } finally {
+    $("send").disabled = false;
+  }
+}
+
+$("f").addEventListener("submit", (e) => { e.preventDefault(); const q = $("q").value.trim(); if (q) { $("q").value = ""; ask(q); } });
+$("q").addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); $("f").requestSubmit(); } });
+$("samples").innerHTML = SAMPLES.map((s) => `<button type="button">${esc(s)}</button>`).join("");
+$("samples").querySelectorAll("button").forEach((b, i) => b.addEventListener("click", () => ask(SAMPLES[i])));
+renderFleet().catch(() => {});
+</script>
+</body>
+</html>

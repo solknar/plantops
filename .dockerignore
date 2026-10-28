@@ -1,0 +1,8 @@
+.venv
+.env
+.pytest_cache
+**/__pycache__
+var/sessions.db
+var/telemetry.db
+var/evals
+tests

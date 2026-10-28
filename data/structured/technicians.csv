@@ -1,0 +1,13 @@
+technician_id,name,plant_id,email,phone,certification
+T-100,Ana Ortiz,DET,ana.ortiz@northwind-fab.example,+1-555-0100,welding
+T-101,Ben Brooks,HOU,ben.brooks@northwind-fab.example,+1-555-0101,electrical
+T-102,Chen Wei,AUS,chen.wei@northwind-fab.example,+1-555-0102,electrical
+T-103,Dana Kowalski,DET,dana.kowalski@northwind-fab.example,+1-555-0103,welding
+T-104,Eli Nguyen,HOU,eli.nguyen@northwind-fab.example,+1-555-0104,welding
+T-105,Fatima Haddad,AUS,fatima.haddad@northwind-fab.example,+1-555-0105,CNC
+T-106,Gus Larsen,DET,gus.larsen@northwind-fab.example,+1-555-0106,CNC
+T-107,Hana Sato,HOU,hana.sato@northwind-fab.example,+1-555-0107,CNC
+T-108,Ivan Petrov,AUS,ivan.petrov@northwind-fab.example,+1-555-0108,hydraulics
+T-109,Jo Reyes,DET,jo.reyes@northwind-fab.example,+1-555-0109,welding
+T-110,Kai Okafor,HOU,kai.okafor@northwind-fab.example,+1-555-0110,electrical
+T-111,Lena Fischer,AUS,lena.fischer@northwind-fab.example,+1-555-0111,welding

@@ -1,0 +1,108 @@
+[
+  {
+    "id": "doc-e42",
+    "category": "docs",
+    "question": "What does error code E-42 mean on the HX-500 press, and what is the first corrective step?",
+    "relevant_docs": ["hx500_hydraulic_press_manual"],
+    "must_include": ["pressure decay", "2 bar/min", "P-1001"],
+    "must_include_any": [["lockout", "LOTO"]]
+  },
+  {
+    "id": "doc-approval",
+    "category": "docs",
+    "question": "Who has to approve a spare-parts purchase order of $12,000?",
+    "relevant_docs": ["spare_parts_policy"],
+    "must_include": ["plant manager"]
+  },
+  {
+    "id": "doc-ontime",
+    "category": "docs",
+    "question": "What on-time delivery rate do suppliers have to achieve, and what happens if they fall below 90%?",
+    "relevant_docs": ["supplier_quality_agreement"],
+    "must_include": ["95%", "probation"]
+  },
+  {
+    "id": "doc-loto",
+    "category": "docs",
+    "question": "How many steps are in our lockout/tagout procedure and what is the last one?",
+    "relevant_docs": ["sop_lockout_tagout"],
+    "must_include_any": [["7", "seven"], ["verify", "verification"]]
+  },
+  {
+    "id": "doc-a17",
+    "category": "docs",
+    "question": "A CNC-7 is throwing spindle overtemperature alarm A-17. What should the technician check before replacing bearings?",
+    "relevant_docs": ["cnc7_machining_center_manual"],
+    "must_include": ["chiller filter"]
+  },
+  {
+    "id": "doc-rca-detroit",
+    "category": "docs",
+    "question": "What was the root cause of the repeated E-42 seal failures on the Detroit presses in March 2026?",
+    "relevant_docs": ["incident_report_2026_03_detroit_press_seals"],
+    "must_include_any": [["critical spare", "critical-spare"], ["gland", "tighten"]]
+  },
+  {
+    "id": "sql-downtime-q3",
+    "category": "sql",
+    "question": "Which plant had the most unplanned downtime minutes in Q3 2026, and how many minutes?",
+    "expected_sql": "SELECT plant_id, SUM(duration_min) FROM downtime_events WHERE reason_code IN ('MECH','ELEC') AND start_ts >= '2026-07-01' AND start_ts < '2026-10-01' GROUP BY 1 ORDER BY 2 DESC LIMIT 1",
+    "fact_columns": [0, 1]
+  },
+  {
+    "id": "sql-open-high",
+    "category": "sql",
+    "question": "How many high-priority maintenance tickets are currently open?",
+    "expected_sql": "SELECT COUNT(*) FROM maintenance_tickets WHERE status = 'open' AND priority = 'high'",
+    "fact_columns": [0]
+  },
+  {
+    "id": "sql-hou-low-stock",
+    "category": "sql",
+    "question": "Which parts are below their reorder point at the Houston plant?",
+    "expected_sql": "SELECT part_id FROM inventory WHERE plant_id = 'HOU' AND on_hand < reorder_point ORDER BY 1",
+    "fact_columns": [0]
+  },
+  {
+    "id": "sql-model-failures",
+    "category": "sql",
+    "question": "Which equipment model has the most unplanned downtime events this year?",
+    "expected_sql": "SELECT m.model FROM downtime_events d JOIN machines m USING(machine_id) WHERE d.reason_code IN ('MECH','ELEC') GROUP BY 1 ORDER BY COUNT(*) DESC LIMIT 1",
+    "fact_columns": [0]
+  },
+  {
+    "id": "hyb-suppliers",
+    "category": "hybrid",
+    "question": "Which suppliers are below the on-time delivery requirement in our supplier quality agreement?",
+    "relevant_docs": ["supplier_quality_agreement"],
+    "expected_sql": "SELECT s.name FROM purchase_orders p JOIN suppliers s USING(supplier_id) WHERE p.received_date IS NOT NULL GROUP BY s.supplier_id HAVING AVG(p.received_date <= p.promised_date) < 0.95 ORDER BY 1",
+    "fact_columns": [0],
+    "must_include": ["95%"]
+  },
+  {
+    "id": "hyb-critical-spares",
+    "category": "hybrid",
+    "question": "Are any critical spares below their reorder point at any plant? List plant and part.",
+    "relevant_docs": ["spare_parts_policy"],
+    "expected_sql": "SELECT plant_id, part_id FROM inventory WHERE part_id IN ('P-1001','P-1002','P-2001','P-4002') AND on_hand < reorder_point ORDER BY 1, 2",
+    "fact_columns": [0, 1]
+  },
+  {
+    "id": "hyb-pm-share",
+    "category": "hybrid",
+    "question": "Are we meeting the preventive maintenance target for share of downtime? What is our actual PM share?",
+    "relevant_docs": ["sop_preventive_maintenance"],
+    "expected_sql": "SELECT ROUND(100.0 * SUM(CASE WHEN reason_code = 'PM' THEN duration_min END) / SUM(duration_min), 1) FROM downtime_events",
+    "fact_columns": [0],
+    "must_include": ["30%"]
+  },
+  {
+    "id": "hyb-det-e42",
+    "category": "hybrid",
+    "question": "How many E-42 downtime events did Detroit have in March 2026, and what corrective actions came out of the RCA?",
+    "relevant_docs": ["incident_report_2026_03_detroit_press_seals"],
+    "expected_sql": "SELECT COUNT(*) FROM downtime_events WHERE plant_id = 'DET' AND error_code = 'E-42' AND start_ts >= '2026-03-01' AND start_ts < '2026-04-01'",
+    "fact_columns": [0],
+    "must_include": ["P-1001"]
+  }
+]

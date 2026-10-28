@@ -1,0 +1,7 @@
+line_id,plant_id,name,product_family
+DET-L1,DET,DET Line 1,body panels
+DET-L2,DET,DET Line 2,body panels
+HOU-L1,HOU,HOU Line 1,chassis frames
+HOU-L2,HOU,HOU Line 2,chassis frames
+AUS-L1,AUS,AUS Line 1,drivetrain housings
+AUS-L2,AUS,AUS Line 2,drivetrain housings
