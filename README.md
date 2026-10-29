@@ -1,5 +1,7 @@
 # PlantOps — a multi-agent GenAI copilot for plant operations
 
+[![CI](https://github.com/solknar/plantops/actions/workflows/ci.yml/badge.svg)](https://github.com/solknar/plantops/actions/workflows/ci.yml)
+
 A forward-deployed-style build for a fictional manufacturer, **Northwind Fabrication** (plants in
 Detroit, Houston and Austin). Plant managers and technicians ask questions like *"Which suppliers
 violate our supplier agreement?"* or *"What does E-42 mean on the HX-500 and what do I do first?"*.
@@ -76,7 +78,8 @@ cp .env.example .env          # paste a free key from https://aistudio.google.co
 .venv/bin/plantops metrics                      # fleet latency / tokens/sec / cost
 ```
 
-No key yet? Everything except the LLM calls works offline:
+No key yet? Everything except the LLM calls works offline. CI runs these same steps on every push
+(`.github/workflows/ci.yml`) and fails the build if retrieval drops below the eval thresholds:
 
 ```bash
 PLANTOPS_EMBEDDER=hash .venv/bin/plantops ingest

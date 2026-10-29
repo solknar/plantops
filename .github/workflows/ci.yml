@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  offline:
+    # Runs without a Gemini key: a scripted LLM drives the agent graph in tests, and the
+    # retrieval eval uses the deterministic hash embedder. The eval exits non-zero when a
+    # metric falls below its threshold, which fails the build.
+    runs-on: ubuntu-latest
+    env:
+      PLANTOPS_EMBEDDER: hash
+      PLANTOPS_VAR_DIR: ${{ github.workspace }}/var
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+          cache: pip
+
+      - name: Install
+        run: pip install -e ".[dev]"
+
+      - name: Tests
+        run: pytest -q
+
+      - name: Build index
+        run: plantops ingest
+
+      - name: Retrieval eval gate
+        run: plantops eval --retrieval-only
+
+      - name: Upload eval report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-report
+          path: var/evals/
+          if-no-files-found: ignore
