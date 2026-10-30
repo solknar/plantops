@@ -37,6 +37,7 @@ class Settings:
     max_reflections: int
     var_dir: Path
     fallback_models: list[str] = field(default_factory=list)
+    max_llm_calls: int = 40
     docs_dir: Path = field(default=ROOT / "data" / "docs")
     structured_dir: Path = field(default=ROOT / "data" / "structured")
     embed_dim: int = 768
@@ -76,6 +77,7 @@ def get_settings() -> Settings:
         embedder=os.getenv("PLANTOPS_EMBEDDER", "gemini"),
         tool_transport=os.getenv("PLANTOPS_TOOL_TRANSPORT", "inprocess"),
         max_reflections=int(os.getenv("PLANTOPS_MAX_REFLECTIONS", "2")),
+        max_llm_calls=int(os.getenv("PLANTOPS_MAX_LLM_CALLS", "40")),
         var_dir=var_dir,
         fallback_models=[m.strip() for m in os.getenv("PLANTOPS_FALLBACK_MODELS", "gemini-3.6-flash,gemini-3-flash-preview,gemini-3.5-flash-lite").split(",") if m.strip()],
     )

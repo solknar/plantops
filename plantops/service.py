@@ -5,6 +5,8 @@ from __future__ import annotations
 import time
 from typing import Any
 
+from google.adk.agents.invocation_context import LlmCallsLimitExceededError
+from google.adk.agents.run_config import RunConfig
 from google.adk.apps.app import App, EventsCompactionConfig
 from google.adk.apps.llm_event_summarizer import LlmEventSummarizer
 from google.adk.runners import Runner
@@ -64,25 +66,35 @@ class PlantOpsService:
         session_id = await self._ensure_session(user_id, session_id)
         steps: list[dict[str, Any]] = []
         last_text = ""
+        limit_reached = False
         t0 = time.perf_counter()
         with tracer.start_as_current_span("plantops.request") as span:
             span.set_attribute("plantops.question", question[:500])
             span.set_attribute("session.id", session_id)
             trace_id = current_trace_id()
-            async for event in self.runner.run_async(
-                user_id=user_id,
-                session_id=session_id,
-                new_message=types.Content(role="user", parts=[types.Part(text=question)]),
-                # Per-turn values the critic/refiner read through instruction templating.
-                state_delta={"question": question, "draft_answer": "", "critique": ""},
-            ):
-                for call in event.get_function_calls():
-                    steps.append({"agent": event.author, "type": "tool_call", "name": call.name, "args": dict(call.args or {})})
-                if event.content and event.content.parts:
-                    text = "".join(p.text or "" for p in event.content.parts if not getattr(p, "thought", False))
-                    if text.strip() and not event.partial:
-                        last_text = text
-                        steps.append({"agent": event.author, "type": "message", "text": text[:2000]})
+            try:
+                async for event in self.runner.run_async(
+                    user_id=user_id,
+                    session_id=session_id,
+                    new_message=types.Content(role="user", parts=[types.Part(text=question)]),
+                    # Per-turn values the critic/refiner read through instruction templating.
+                    state_delta={"question": question, "draft_answer": "", "critique": ""},
+                    # Hard ceiling on model calls. The prompts ask each ReAct loop for at most 3 retries;
+                    # this enforces a bound in code. AgentTool runs inherit the config, so it caps the
+                    # top-level run and each specialist run separately.
+                    run_config=RunConfig(max_llm_calls=self.settings.max_llm_calls),
+                ):
+                    for call in event.get_function_calls():
+                        steps.append({"agent": event.author, "type": "tool_call", "name": call.name, "args": dict(call.args or {})})
+                    if event.content and event.content.parts:
+                        text = "".join(p.text or "" for p in event.content.parts if not getattr(p, "thought", False))
+                        if text.strip() and not event.partial:
+                            last_text = text
+                            steps.append({"agent": event.author, "type": "message", "text": text[:2000]})
+            except LlmCallsLimitExceededError as e:
+                limit_reached = True
+                span.add_event("llm_calls_limit_exceeded", {"max_llm_calls": self.settings.max_llm_calls, "error": str(e)})
+                steps.append({"agent": "service", "type": "stopped", "text": str(e)})
         session = await self.sessions.get_session(app_name=APP_NAME, user_id=user_id, session_id=session_id)
         state = session.state if session else {}
         answer = state.get("draft_answer") or last_text
@@ -90,10 +102,16 @@ class PlantOpsService:
         flush()
         metrics = self.metrics.completed.pop(trace_id, None) or {"latency_ms": round((time.perf_counter() - t0) * 1000, 1)}
         # exit_loop skips the critic's closing summary, so approval is read from the tool call.
-        approved = any(s["type"] == "tool_call" and s["name"] == "exit_loop" for s in steps)
+        approved = not limit_reached and any(s["type"] == "tool_call" and s["name"] == "exit_loop" for s in steps)
+        if limit_reached:
+            answer = (
+                f"Stopped after reaching the limit of {self.settings.max_llm_calls} model calls before an answer was "
+                f"verified." + (f"\n\nUnverified draft:\n{answer}" if answer else "")
+            )
         return {
             "answer": answer,
             "approved_by_critic": approved,
+            "limit_reached": limit_reached,
             "critique": critique,
             "session_id": session_id,
             "trace_id": trace_id,

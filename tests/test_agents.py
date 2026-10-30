@@ -67,6 +67,35 @@ async def test_critic_and_refiner_get_question_via_state_not_history(service):
     assert not critic_req.contents or all(c.role != "model" for c in critic_req.contents)
 
 
+async def test_runaway_react_loop_is_stopped_by_max_llm_calls(settings):
+    from dataclasses import replace
+
+    from google.adk.sessions import InMemorySessionService
+
+    from plantops.service import PlantOpsService
+    from plantops.testing import ScriptedLlm
+
+    # The analyst never stops calling run_sql; only the code-level ceiling can end the loop.
+    llm = ScriptedLlm({
+        "coordinator": [Call("data_analyst", {"request": "count open tickets"}), "**Answer**: draft"],
+        "data_analyst": [Call("run_sql", {"query": "SELECT 1"})] * 50,
+    })
+    svc = PlantOpsService(replace(settings, max_llm_calls=5), worker=llm, strong=llm,
+                          session_service=InMemorySessionService(), synchronous_tracing=True)
+    res = await svc.ask("How many open tickets?", session_id="t-runaway")
+
+    assert res["limit_reached"] is True and res["approved_by_critic"] is False
+    assert res["answer"].startswith("Stopped after reaching the limit of 5 model calls")
+    assert res["steps"][-1]["type"] == "stopped"
+    assert len(llm.seen["data_analyst"]) == 5  # the 6th call is refused before reaching the model
+    assert "critic" not in llm.seen
+
+
+def test_max_llm_calls_default_leaves_headroom(settings):
+    # Real runs peaked at 23 model calls in the top-level run; the default must stay well above that.
+    assert settings.max_llm_calls == 40
+
+
 def _fr(name, payload):
     return types.Content(role="user", parts=[types.Part(function_response=types.FunctionResponse(name=name, response=payload))])
 

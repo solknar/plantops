@@ -26,7 +26,7 @@ Runs locally on the **Gemini API free tier**. The only cloud dependency is an AI
 | Agentic workflows + **MCP servers** | `plantops/mcp_server.py` exposes the same guarded tools over MCP (stdio or streamable HTTP). `PLANTOPS_TOOL_TRANSPORT=mcp` makes the agents use it through ADK `McpToolset` |
 | Connecting AI to the customer's systems: APIs, legacy data, security perimeters | `plantops/tools/sql.py`: read-only at the storage layer, plus a SQLite **authorizer** that allows only SELECT-shaped operations and NULLs PII columns, a timeout and a row cap. Vector-store filters are whitelisted to block injection |
 | Evaluation pipelines (accuracy, safety, latency) | `plantops/evals/`: golden set whose expected answers are **computed from the warehouse**. Retrieval recall@k/MRR (offline), fact recall, citation validity, critic approval, optional LLM-as-judge, latency/cost; **CI gate** with a non-zero exit code |
-| Reusable modules / best practices | Offline test suite (36 tests) using a scripted LLM, so the whole agent graph runs in CI with no API calls |
+| Reusable modules / best practices | Offline test suite (38 tests) using a scripted LLM, so the whole agent graph runs in CI with no API calls |
 
 ## Architecture
 
@@ -112,6 +112,8 @@ less distracting.
 **Why the critic uses tools.** A critic that only re-reads the draft mostly checks style. This one
 re-opens cited chunks and re-runs key SQL, so hallucinated citations and wrong numbers get caught.
 Approval comes from the `exit_loop` call, and the loop is capped by `PLANTOPS_MAX_REFLECTIONS`.
+The ReAct prompts ask for at most 3 retries, and `PLANTOPS_MAX_LLM_CALLS` (default 40) enforces a ceiling in code:
+a runaway loop stops with `limit_reached: true` and an unapproved answer instead of running up cost.
 
 **Security perimeter in the database, not the prompt.** The SQL guard uses SQLite's authorizer, so
 `SELECT *` on `technicians` works but returns NULL for email/phone, and anything that is not a read
